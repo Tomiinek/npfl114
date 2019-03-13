@@ -18,7 +18,7 @@ parser.add_argument("--threads", default=1, type=int, help="Maximum number of th
 args = parser.parse_args()
 
 # Create logdir name
-args.logdir = "logs/{}-{}-{}".format(
+args.logdir = "logs\\{}-{}-{}".format(
     os.path.basename(__file__),
     datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
     ",".join(("{}={}".format(re.sub("(.)[^_]*_?", r"\1", key), value) for key, value in sorted(vars(args).items())))
