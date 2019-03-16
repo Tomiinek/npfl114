@@ -12,13 +12,13 @@ from mnist import MNIST
 # Parse arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("--batch_size", default=50, type=int, help="Batch size.")
-parser.add_argument("--decay", default=None, type=str, help="Learning decay rate type");
+parser.add_argument("--decay", default=None, type=str, help="Learning decay rate type")
 parser.add_argument("--epochs", default=10, type=int, help="Number of epochs.")
 parser.add_argument("--hidden_layer", default=200, type=int, help="Size of the hidden layer.")
-parser.add_argument("--learning_rate", default=0.01, type=float, help="Initial learning rate.");
-parser.add_argument("--learning_rate_final", default=None, type=float, help="Final learning rate.");
-parser.add_argument("--momentum", default=None, type=float, help="Momentum.");
-parser.add_argument("--optimizer", default="SGD", type=str, help="Optimizer to use.");
+parser.add_argument("--learning_rate", default=0.01, type=float, help="Initial learning rate.")
+parser.add_argument("--learning_rate_final", default=None, type=float, help="Final learning rate.")
+parser.add_argument("--momentum", default=None, type=float, help="Momentum.")
+parser.add_argument("--optimizer", default="SGD", type=str, help="Optimizer to use.")
 parser.add_argument("--recodex", default=False, action="store_true", help="Evaluation in ReCodEx.")
 parser.add_argument("--threads", default=1, type=int, help="Maximum number of threads to use.")
 args = parser.parse_args()
@@ -32,11 +32,11 @@ tf.config.threading.set_inter_op_parallelism_threads(args.threads)
 tf.config.threading.set_intra_op_parallelism_threads(args.threads)
 
 # Create logdir name
-args.logdir = "logs/{}-{}-{}".format(
+args.logdir = os.path.join("logs", "{}-{}-{}".format(
     os.path.basename(__file__),
     datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
     ",".join(("{}={}".format(re.sub("(.)[^_]*_?", r"\1", key), value) for key, value in sorted(vars(args).items())))
-)
+))
 
 # Load data
 mnist = MNIST()
@@ -55,8 +55,8 @@ model = tf.keras.Sequential([
 # - for `polynomial`, use `tf.keras.optimizers.schedules.PolynomialDecay`
 #   using the given `args.learning_rate_final`;
 # - for `exponential`, use `tf.keras.optimizers.schedules.ExponentialDecay`
-#   and setting `decay_rate` appropriately to reach `args.learning_rate_final`
-#   just after the training.
+#   and set `decay_rate` appropriately to reach `args.learning_rate_final`
+#   just after the training (and keep the default `staircase=False`).
 # In both cases, `decay_steps` should be total number of training batches.
 # If a learning rate schedule is used, you can find out current learning rate
 # by using `model.optimizer.learning_rate(model.optimizer.iterations)`,
@@ -83,5 +83,5 @@ test_logs = model.evaluate(
 tb_callback.on_epoch_end(1, dict(("val_test_" + metric, value) for metric, value in zip(model.metrics_names, test_logs)))
 
 # TODO: Write test accuracy as percentages rounded to two decimal places.
-with open("mnist_training", "w") as out_file:
+with open("mnist_training.out", "w") as out_file:
     print("{:.2f}".format(100 * accuracy), file=out_file)
