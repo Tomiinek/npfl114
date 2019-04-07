@@ -6,3 +6,6 @@ labs/03/uppercase_old_tf_backup.py
 *.out
 *.xml
 *.iml
+*.png
+labs/04/prdel0.png
+*.png

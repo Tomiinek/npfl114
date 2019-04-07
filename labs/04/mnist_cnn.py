@@ -1,13 +1,50 @@
 #!/usr/bin/env python3
 import numpy as np
 import tensorflow as tf
+import re
 
 from mnist import MNIST
+
+
+def add_layers(inputs, specification):
+
+    comma_regex = re.compile(",(?![^\[\]]*\])")
+    for layer in comma_regex.split(specification):
+
+        print(layer)
+
+        minus_regex = re.compile("-(?![^\[\]]*\])")
+        lp = minus_regex.split(layer)
+
+        print(lp)
+
+        type = lp[0]
+        if type == "C":
+            inputs = tf.keras.layers.Conv2D(filters=int(lp[1]), kernel_size=int(lp[2]), strides=int(lp[3]), padding=lp[4], activation=tf.nn.relu)(inputs)
+        elif type == "CB":
+            inputs = tf.keras.layers.Conv2D(filters=int(lp[1]), kernel_size=int(lp[2]), strides=int(lp[3]), padding=lp[4], use_bias=False, activation=None)(inputs)
+            inputs = tf.keras.layers.BatchNormalization()(inputs)
+            inputs = tf.keras.layers.ReLU()(inputs)
+        elif type == "M": inputs = tf.keras.layers.MaxPool2D(pool_size=int(lp[1]), strides=int(lp[2]))(inputs)
+        elif type == "F": inputs = tf.keras.layers.Flatten()(inputs)
+        elif type == "R":
+            old_inputs = inputs
+            inputs = add_layers(inputs, lp[1][1:-1])
+            inputs = tf.keras.layers.Add()([old_inputs, inputs])
+        elif type == "D": inputs = tf.keras.layers.Dense(lp[1], activation=tf.nn.relu)(inputs)
+
+    return inputs
+
 
 # The neural network model
 class Network(tf.keras.Model):
     def __init__(self, args):
         inputs = tf.keras.layers.Input(shape=[MNIST.H, MNIST.W, MNIST.C])
+
+        # --cnn=CB-16-5-2-same,M-3-2,F,D-100
+        # R-[C-16-3-1-same,C-16-3-1-same]
+
+        hidden = add_layers(inputs, args.cnn)
 
         # TODO: Add CNN layers specified by `args.cnn`, which contains
         # comma-separated list of the following layers:
@@ -21,7 +58,6 @@ class Network(tf.keras.Model):
         #   of at least one convolutional layer (but not a recursive residual connection `R`).
         #   The input to the specified layers is then added to their output.
         # - `F`: Flatten inputs. Must appear exactly once in the architecture.
-        # - `D-hidden_layer_size`: Add a dense layer with ReLU activation and specified size.
         # Produce the results in variable `hidden`.
 
         # Add the final output layer
