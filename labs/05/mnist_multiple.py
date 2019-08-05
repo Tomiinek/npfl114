@@ -1,32 +1,44 @@
 #!/usr/bin/env python3
 import numpy as np
 import tensorflow as tf
+from tensorflow.keras.layers import Concatenate, Flatten, Dense, Conv2D, Input
+from tensorflow.keras.models import Model
 
 from mnist import MNIST
 
 # The neural network model
 class Network:
     def __init__(self, args):
-        # TODO: Add a `self.model` which has two inputs, both images of size [MNIST.H, MNIST.W, MNIST.C].
-        # It then passes each input image through the same network (with shared weights), performing
-        # - convolution with 10 filters, 3x3 kernel size, stride 2, "valid" padding, ReLU activation
-        # - convolution with 20 filters, 3x3 kernel size, stride 2, "valid" padding, ReLU activation
-        # - flattening layer
-        # - fully connected layer with 200 neurons and ReLU activation
-        # obtaining a 200-dimensional feature representation of each image.
-        #
-        # Then, it produces three outputs:
-        # - classify the computed representation of the first image using a densely connected layer
-        #   into 10 classes;
-        # - classify the computed representation of the second image using the
-        #   same connected layer (with shared weights) into 10 classes;
-        # - concatenate the two image representations, process them using another fully connected
-        #   layer with 200 neurons and ReLU, and finally compute one output with tf.nn.sigmoid
-        #   activation (the goal is to predict if the first digit is larger than the second)
-        #
-        # Train the outputs using SparseCategoricalCrossentropy for the first two inputs
-        # and BinaryCrossentropy for the third one, utilizing Adam with default arguments.
-        pass
+
+        image_a = Input(shape=(MNIST.H, MNIST.W, MNIST.C), dtype=tf.float32)
+        image_b = Input(shape=(MNIST.H, MNIST.W, MNIST.C), dtype=tf.float32)
+
+        embedding_network = self._build()
+        embedding_a = embedding_network(image_a)
+        embedding_b = embedding_network(image_b)
+
+        class_layer = Dense(10, activation='softmax')
+        class_prediction_a = class_layer(embedding_a)
+        class_prediction_b = class_layer(embedding_b)
+        a_b_concat = Concatenate()([embedding_a, embedding_b])
+        embedding_a_b = Dense(200, activation='relu')(a_b_concat)
+        order_prediction = Dense(1, activation='sigmoid')(embedding_a_b)
+
+        self.model = Model(inputs=[image_a, image_b], outputs=[class_prediction_a, class_prediction_b, order_prediction])
+        self.model.compile(
+            optimizer=tf.keras.optimizers.Adam(),
+            loss=['sparse_categorical_crossentropy', 'sparse_categorical_crossentropy', 'binary_crossentropy'],
+            metrics=['sparse_categorical_accuracy', 'sparse_categorical_accuracy', 'binary_accuracy'],
+        )
+
+    @staticmethod
+    def _build():
+        return tf.keras.Sequential([
+            Conv2D(10, kernel_size=3, strides=2, padding='valid', activation='relu'),
+            Conv2D(20, kernel_size=3, strides=2, padding='valid', activation='relu'),
+            Flatten(),
+            Dense(200, activation='relu'),
+        ])
 
     @staticmethod
     def _prepare_batches(batches_generator):
@@ -34,27 +46,26 @@ class Network:
         for batch in batches_generator:
             batches.append(batch)
             if len(batches) >= 2:
-                # TODO: yield the suitable modified inputs and targets using batches[0:2]
-                yield (model_inputs, model_targets)
+                yield ([batches[0]["images"], batches[1]["images"]],
+                       [batches[0]["labels"], batches[1]["labels"], batches[0]["labels"] > batches[1]["labels"]])
                 batches.clear()
 
     def train(self, mnist, args):
         for epoch in range(args.epochs):
-            # TODO: Train for one epoch using `model.train_on_batch` for each batch.
-            for batch in self._prepare_batches(mnist.train.batches(args.batch_size)):
-                pass
-
+            for x, y in self._prepare_batches(mnist.train.batches(args.batch_size)):
+                self.model.train_on_batch(x, y)
             # Print development evaluation
             print("Dev {}: directly predicting: {:.4f}, comparing digits: {:.4f}".format(epoch + 1, *self.evaluate(mnist.dev, args)))
 
     def evaluate(self, dataset, args):
-        # TODO: Evaluate the given dataset, returning two accuracies, the first being
-        # the direct prediction of the model, and the second computed by comparing predicted
-        # labels of the images.
+        da = ia = 0
         for inputs, targets in self._prepare_batches(dataset.batches(args.batch_size)):
-            pass
-
-        return direct_accuracy, indirect_accuracy
+            predictions = self.model.predict_on_batch(inputs)
+            direct_predictions = np.squeeze(predictions[2] > 0.5)
+            indirect_predictions = np.argmax(predictions[0], axis=1) > np.argmax(predictions[1], axis=1)
+            da += np.sum(direct_predictions == targets[2])
+            ia += np.sum(indirect_predictions == targets[2])
+        return da / (dataset.size // 2), ia / (dataset.size // 2)
 
 
 if __name__ == "__main__":
